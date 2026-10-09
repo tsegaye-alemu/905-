@@ -74,7 +74,7 @@
   const db = getDatabase(app);
 
   // 1. Handle saving information globally when the save button is clicked
-  const saveBtn = document.querySelector("button[class*='save'], #saveInfoBtn"); 
+  const saveBtn = document.querySelector("button[class*='save'], #saveInfoBtn, button.btn-primary"); 
   if (saveBtn) {
     saveBtn.addEventListener("click", (e) => {
       const titleInput = document.querySelector("input[placeholder*='Feeder Outage']");
@@ -110,17 +110,21 @@
     });
   }
 
-  // 2. Listen for real-time updates to update the badge count instantly for all users
+  // 2. Listen for real-time updates and update the "2. Saved Info (X)" button text accurately
   const dbRef = ref(db, 'saved_info');
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     const items = data ? Object.values(data) : [];
+    const count = items.length;
     
-    // Updates the badge counter showing total saved items
-    const badgeElement = document.querySelector("[class*='saved'], span[style*='background']");
-    if (badgeElement) {
-      badgeElement.textContent = items.length;
-    }
+    // Find all buttons or elements containing "Saved Info" and update them
+    const allButtons = document.querySelectorAll("button, a, div");
+    allButtons.forEach(el => {
+      if (el.textContent && el.textContent.includes("Saved Info")) {
+        // Keeps the text clean like "2. Saved Info (1)"
+        el.textContent = `2. Saved Info (${count})`;
+      }
+    });
   });
 </script>
     <style>
