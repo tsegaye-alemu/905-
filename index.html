@@ -73,54 +73,54 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // 1. Handle saving information globally when the save button is clicked
-  const saveBtn = document.querySelector("button.btn-primary, button[style*='background'], #saveInfoBtn"); 
-  if (saveBtn) {
-    saveBtn.addEventListener("click", (e) => {
-      const titleInput = document.querySelector("input[placeholder*='Feeder Outage']");
-      const categoryInput = document.querySelector("input[placeholder*='Technical']");
-      const detailsInput = document.querySelector("textarea, input[placeholder*='Enter details']");
+  // --- 1. HANDLE SAVING DATA GLOBALLY ---
+  // This matches your form's onsubmit="handleSaveInfo(event)"
+  window.handleSaveInfo = function(event) {
+    event.preventDefault();
 
-      const title = titleInput ? titleInput.value : "";
-      const category = categoryInput ? categoryInput.value : "";
-      const details = detailsInput ? detailsInput.value : "";
+    const titleInput = document.getElementById("infoTitle");
+    const categoryInput = document.getElementById("infoCategory");
+    const detailsInput = document.getElementById("infoDetails");
 
-      if (!title || !details) {
-        alert("Please fill in the title and details.");
-        return;
-      }
+    const title = titleInput ? titleInput.value.trim() : "";
+    const category = categoryInput ? categoryInput.value.trim() : "";
+    const details = detailsInput ? detailsInput.value.trim() : "";
 
-      // Push data to Firebase under 'saved_info'
-      const savedInfoRef = ref(db, 'saved_info');
-      const newItemRef = push(savedInfoRef);
-      
-      set(newItemRef, {
-        title: title,
-        category: category,
-        details: details,
-        timestamp: Date.now()
-      }).then(() => {
-        alert("Saved successfully and synced globally for all users!");
-        if(titleInput) titleInput.value = "";
-        if(categoryInput) categoryInput.value = "";
-        if(detailsInput) detailsInput.value = "";
-      }).catch((error) => {
-        console.error("Error saving data: ", error);
-      });
+    if (!title || !details) {
+      alert("Please fill in the title and details.");
+      return;
+    }
+
+    // Push data to Firebase Realtime Database under 'saved_info'
+    const savedInfoRef = ref(db, 'saved_info');
+    const newItemRef = push(savedInfoRef);
+
+    set(newItemRef, {
+      title: title,
+      category: category,
+      details: details,
+      timestamp: Date.now()
+    }).then(() => {
+      alert("Saved successfully and synced globally for all users!");
+      // Reset form fields
+      if (titleInput) titleInput.value = "";
+      if (categoryInput) categoryInput.value = "";
+      if (detailsInput) detailsInput.value = "";
+    }).catch((error) => {
+      console.error("Firebase save error: ", error);
+      alert("Failed to save. Check console for details.");
     });
-  }
+  };
 
-  // 2. Listen for real-time updates and update ONLY the count inside the parentheses
+  // --- 2. LISTEN FOR REAL-TIME UPDATES & UPDATE THE BADGE COUNTER ---
   const dbRef = ref(db, 'saved_info');
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     const items = data ? Object.values(data) : [];
     const count = items.length;
-    
-    // Safely look for elements or buttons with "Saved Info" and update only the text portion cleanly
-    const buttons = document.querySelectorAll("button, a, div, span");
-    buttons.forEach(el => {
-      // Check if this specific element represents the Saved Info tab button
+
+    // Search and update elements containing "Saved Info" to display the active global count
+    document.querySelectorAll("*").forEach(el => {
       if (el.children.length === 0 && el.textContent.includes("Saved Info")) {
         el.textContent = `2. Saved Info (${count})`;
       }
