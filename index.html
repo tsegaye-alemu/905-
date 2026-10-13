@@ -74,7 +74,6 @@
   const db = getDatabase(app);
 
   // --- 1. HANDLE SAVING DATA GLOBALLY ---
-  // This matches your form's onsubmit="handleSaveInfo(event)"
   window.handleSaveInfo = function(event) {
     event.preventDefault();
 
@@ -87,11 +86,10 @@
     const details = detailsInput ? detailsInput.value.trim() : "";
 
     if (!title || !details) {
-      alert("Please fill in the title and details.");
+      alert("Please fill in the title and details fields.");
       return;
     }
 
-    // Push data to Firebase Realtime Database under 'saved_info'
     const savedInfoRef = ref(db, 'saved_info');
     const newItemRef = push(savedInfoRef);
 
@@ -102,29 +100,61 @@
       timestamp: Date.now()
     }).then(() => {
       alert("Saved successfully and synced globally for all users!");
-      // Reset form fields
       if (titleInput) titleInput.value = "";
       if (categoryInput) categoryInput.value = "";
       if (detailsInput) detailsInput.value = "";
     }).catch((error) => {
       console.error("Firebase save error: ", error);
-      alert("Failed to save. Check console for details.");
+      alert("Failed to save data.");
     });
   };
 
-  // --- 2. LISTEN FOR REAL-TIME UPDATES & UPDATE THE BADGE COUNTER ---
+  // --- 2. LISTEN FOR REAL-TIME UPDATES & RENDER LIST + COUNTS ---
   const dbRef = ref(db, 'saved_info');
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     const items = data ? Object.values(data) : [];
     const count = items.length;
 
-    // Search and update elements containing "Saved Info" to display the active global count
-    document.querySelectorAll("*").forEach(el => {
-      if (el.children.length === 0 && el.textContent.includes("Saved Info")) {
-        el.textContent = `2. Saved Info (${count})`;
+    // Update inline count text
+    const inlineTotal = document.getElementById("savedTotalInline");
+    if (inlineTotal) {
+      inlineTotal.textContent = count;
+    }
+
+    // Update notification badge visibility & count
+    const badge = document.getElementById("savedCountBadge");
+    if (badge) {
+      badge.textContent = count;
+      if (count > 0) {
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
       }
-    });
+    }
+
+    // Render the saved items list dynamically into #savedInfoContainer
+    const container = document.getElementById("savedInfoContainer");
+    if (container) {
+      container.innerHTML = ""; // Clear existing list
+      
+      if (items.length === 0) {
+        container.innerHTML = `<p class="text-gray-500 text-sm italic p-4 bg-white rounded-xl border border-gray-200">No saved information available yet.</p>`;
+      } else {
+        items.reverse().forEach(item => {
+          const card = document.createElement("div");
+          card.className = "p-4 bg-white border-2 border-gray-200 rounded-xl shadow-sm mb-3";
+          card.innerHTML = `
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-sm text-blue-900">${item.title}</span>
+              <span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-semibold">${item.category || 'General'}</span>
+            </div>
+            <p class="text-sm text-gray-700">${item.details}</p>
+          `;
+          container.appendChild(card);
+        });
+      }
+    }
   });
 </script>
     <style>
@@ -364,64 +394,66 @@
             <!-- Content Area -->
             <div class="p-4 sm:p-8 flex-1 bg-white overflow-x-hidden">
                 
-                <!-- SECTION 1: SMS GENERATOR & CUSTOM INFORMATION SUBMISSION -->
                 <div id="smsTab" class="space-y-6">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
-                        <div>
-                            <h2 id="smsMainTitle" class="text-2xl font-bold text-gray-900 mb-1">SMS Generator (Separated)</h2>
-                            <p id="smsMainSubtitle" class="text-gray-600 text-sm sm:text-base">የአቤቱታ ቁጥር እና የቶከን ቁጥር SMS ማዘጋጃዎች</p>
-                        </div>
-                        
-                        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                            <!-- Toggle Sub-Section Buttons (Custom Blue Theme) -->
-                            <div class="flex items-center gap-2 mb-4">
-    <button id="otherInfoBtn" onclick="switchSubSection('otherInfo')" class="bg-customBlue-600 text-white font-bold py-2 px-4 rounded-lg text-sm">
-        1. Other Information
-    </button>
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+        <div>
+            <h2 id="smsMainTitle" class="text-2xl font-bold text-gray-900 mb-1">SMS Generator (Separated)</h2>
+            <p id="smsMainSubtitle" class="text-gray-600 text-sm sm:text-base">የአቤቱታ ቁጥር እና የቶከን ቁጥር SMS ማዘጋጃዎች</p>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <!-- Toggle Sub-Section Buttons -->
+            <div class="flex items-center gap-2 mb-4">
+                <button id="otherInfoBtn" onclick="switchSubSection('otherInfo')" class="bg-customBlue-600 text-white font-bold py-2 px-4 rounded-lg text-sm">
+                    1. Other Information
+                </button>
 
-    <!-- Tab Button targeting savedInfoSubSection -->
-    <button id="savedInfoBtn" onclick="switchSubSection('savedInfo')" class="relative bg-white text-customBlue-800 border border-customBlue-400 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
-        <span>📂 2. Saved Info (<span id="savedTotalInline">0</span>)</span>
+                <button id="savedInfoBtn" onclick="switchSubSection('savedInfo')" class="relative bg-white text-customBlue-800 border border-customBlue-400 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
+                    <span>📂 2. Saved Info (<span id="savedTotalInline">0</span>)</span>
+                    <span id="savedCountBadge" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                        0
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
 
-        <!-- Red Notification Badge -->
-        <span id="savedCountBadge" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
-            0
-        </span>
-    </button>
+    <!-- SUB-SECTION 1: OTHER INFORMATION FORM -->
+    <div id="otherInfoSubSection" class="space-y-6">
+        <div class="bg-customBlue-50/80 border-2 border-customBlue-300 rounded-2xl p-5 shadow-sm">
+            <h3 class="text-lg font-bold text-customBlue-950 mb-3 flex items-center gap-2">
+                📌 1. Add Other Information / ተጨማሪ መረጃ ማስገቢያ
+            </h3>
+            <form id="otherInfoForm" onsubmit="handleSaveInfo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Title / Title Code:</label>
+                    <input type="text" id="infoTitle" required placeholder="e.g. Feeder Outage, Note..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Category / Type:</label>
+                    <input type="text" id="infoCategory" required placeholder="e.g. Technical, Billing..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Details / Description:</label>
+                    <input type="text" id="infoDetails" required placeholder="Enter details to be stored..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                </div>
+                <div class="sm:col-span-3 flex justify-end">
+                    <button type="submit" class="bg-customBlue-600 hover:bg-customBlue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition flex items-center gap-2">
+                        💾 Save Information to No. 2
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SUB-SECTION 2: SAVED INFO LIST CONTAINER -->
+    <div id="savedInfoSubSection" class="space-y-4 hidden">
+        <h3 class="text-lg font-bold text-gray-900 mb-2">📂 Globally Saved Information List</h3>
+        <div id="savedInfoContainer">
+            <!-- Saved items will populate here automatically in real time -->
+        </div>
+    </div>
 </div>
-
-                            
-                        </div>
-                    </div>
-
-                    <!-- SUB-SECTION 1: OTHER INFORMATION (BLUE THEMED PANEL + GREEN SMS GENERATORS) -->
-                    <div id="otherInfoSubSection" class="space-y-6">
-                        <!-- Custom Data Submission Panel (CUSTOM BLUE THEME) -->
-                        <div class="bg-customBlue-50/80 border-2 border-customBlue-300 rounded-2xl p-5 shadow-sm">
-                            <h3 class="text-lg font-bold text-customBlue-950 mb-3 flex items-center gap-2">
-                                📌 1. Add Other Information / ተጨማሪ መረጃ ማስገቢያ
-                            </h3>
-                            <form id="otherInfoForm" onsubmit="handleSaveInfo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Title / Title Code:</label>
-                                    <input type="text" id="infoTitle" required placeholder="e.g. Feeder Outage, Note..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Category / Type:</label>
-                                    <input type="text" id="infoCategory" required placeholder="e.g. Technical, Billing..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Details / Description:</label>
-                                    <input type="text" id="infoDetails" required placeholder="Enter details to be stored..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                                </div>
-                                <div class="sm:col-span-3 flex justify-end">
-                                    <button type="submit" class="bg-customBlue-600 hover:bg-customBlue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition flex items-center gap-2">
-                                        💾 Save Information to No. 2
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
                         <!-- Form Control Actions Bar -->
                         <div class="flex flex-wrap gap-3">
                             <button id="fillSampleBtn" onclick="fillSampleSms()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center gap-2">
