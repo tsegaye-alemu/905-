@@ -15,7 +15,6 @@
             theme: {
                 extend: {
                     colors: {
-                        // Special Blue ONLY for requested toggle buttons & panel
                         customBlue: {
                             50: '#eef3ff',
                             100: '#e0eaff',
@@ -23,13 +22,12 @@
                             300: '#a4bcfd',
                             400: '#7a96fc',
                             500: '#526cf9',
-                            600: '#185BFF', // Vibrant Blue from image
+                            600: '#185BFF',
                             700: '#1347db',
                             800: '#163ab1',
                             900: '#17348c',
                             950: '#0d1f5e',
                         },
-                        // Green for default portal theme
                         customGreen: {
                             50: '#f0fdf4',
                             100: '#dcfce7',
@@ -68,7 +66,6 @@
             top: 0;
             z-index: 10;
         }
-        /* Custom scrollbars */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -90,124 +87,257 @@
     <div id="copyToast" class="hidden fixed bottom-6 right-6 bg-customGreen-800 text-white px-6 py-3.5 rounded-xl shadow-2xl font-bold text-base transition-all z-50 flex items-center gap-2.5">
         <span class="text-xl">✅</span> <span id="toastMsg">Action completed successfully!</span>
     </div>
+
     <script type="module">
-  // Import Firebase SDKs
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
-  import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-database.js";
+        // Import Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+        import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-database.js";
 
-  // Your Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBUWb3hEFsXWVyEILCfqpPK2wMpHtuhE8",
-    authDomain: "contact-center905.firebaseapp.com",
-    databaseURL: "https://contact-center905-default-rtdb.firebaseio.com",
-    projectId: "contact-center905",
-    storageBucket: "contact-center905.firebasestorage.app",
-    messagingSenderId: "799136419076",
-    appId: "1:799136419076:web:abe075c18ff1329f1c5451",
-    measurementId: "G-G2QF2F1Q84"
-  };
+        const firebaseConfig = {
+            apiKey: "AIzaSyBUWb3hEFsXWVyEILCfqpPK2wMpHtuhE8",
+            authDomain: "contact-center905.firebaseapp.com",
+            databaseURL: "https://contact-center905-default-rtdb.firebaseio.com",
+            projectId: "contact-center905",
+            storageBucket: "contact-center905.firebasestorage.app",
+            messagingSenderId: "799136419076",
+            appId: "1:799136419076:web:abe075c18ff1329f1c5451",
+            measurementId: "G-G2QF2F1Q84"
+        };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-  // --- 1. HANDLE SAVING DATA GLOBALLY ---
-  window.handleSaveInfo = function(event) {
-    event.preventDefault();
+        window.handleSaveInfo = function(event) {
+            event.preventDefault();
+            const titleInput = document.getElementById("infoTitle");
+            const categoryInput = document.getElementById("infoCategory");
+            const detailsInput = document.getElementById("infoDetails");
 
-    const titleInput = document.getElementById("infoTitle");
-    const categoryInput = document.getElementById("infoCategory");
-    const detailsInput = document.getElementById("infoDetails");
+            const title = titleInput ? titleInput.value.trim() : "";
+            const category = categoryInput ? categoryInput.value.trim() : "";
+            const details = detailsInput ? detailsInput.value.trim() : "";
 
-    const title = titleInput ? titleInput.value.trim() : "";
-    const category = categoryInput ? categoryInput.value.trim() : "";
-    const details = detailsInput ? detailsInput.value.trim() : "";
+            if (!title || !details) {
+                alert("Please fill in the title and details fields.");
+                return;
+            }
 
-    if (!title || !details) {
-      alert("Please fill in the title and details fields.");
-      return;
-    }
+            const savedInfoRef = ref(db, 'saved_info');
+            const newItemRef = push(savedInfoRef);
 
-    const savedInfoRef = ref(db, 'saved_info');
-    const newItemRef = push(savedInfoRef);
+            set(newItemRef, {
+                title: title,
+                category: category,
+                details: details,
+                timestamp: Date.now()
+            }).then(() => {
+                showToast("Saved successfully and synced globally!");
+                if (titleInput) titleInput.value = "";
+                if (categoryInput) categoryInput.value = "";
+                if (detailsInput) detailsInput.value = "";
+            }).catch((error) => {
+                console.error("Firebase save error: ", error);
+                alert("Failed to save data.");
+            });
+        };
 
-    set(newItemRef, {
-      title: title,
-      category: category,
-      details: details,
-      timestamp: Date.now()
-    }).then(() => {
-      alert("Saved successfully and synced globally for all users!");
-      if (titleInput) titleInput.value = "";
-      if (categoryInput) categoryInput.value = "";
-      if (detailsInput) detailsInput.value = "";
-    }).catch((error) => {
-      console.error("Firebase save error: ", error);
-      alert("Failed to save data.");
-    });
-  };
+        const dbRef = ref(db, 'saved_info');
+        onValue(dbRef, (snapshot) => {
+            const data = snapshot.val();
+            const items = data ? Object.values(data) : [];
+            const count = items.length;
 
-  // --- 2. VIEW SWITCHER (Fixes the jumping/scrolling issue) ---
-  window.switchView = function(viewId) {
-    // Hide all main content sections (make sure your views have classes or IDs like 'view-1', 'view-2', etc.)
-    const views = document.querySelectorAll('.portal-view');
-    views.forEach(v => v.classList.add('hidden'));
+            const inlineTotal = document.getElementById("savedTotalInline");
+            if (inlineTotal) inlineTotal.textContent = count;
 
-    // Show the target view
-    const targetView = document.getElementById(viewId);
-    if (targetView) {
-      targetView.classList.remove('hidden');
-    }
-  };
+            const badge = document.getElementById("savedCountBadge");
+            if (badge) {
+                badge.textContent = count;
+                if (count > 0) badge.classList.remove("hidden");
+                else badge.classList.add("hidden");
+            }
 
-  // --- 3. LISTEN FOR REAL-TIME UPDATES & RENDER LIST + COUNTS ---
-  const dbRef = ref(db, 'saved_info');
-  onValue(dbRef, (snapshot) => {
-    const data = snapshot.val();
-    const items = data ? Object.values(data) : [];
-    const count = items.length;
-
-    // Update inline count text
-    const inlineTotal = document.getElementById("savedTotalInline");
-    if (inlineTotal) {
-      inlineTotal.textContent = count;
-    }
-
-    // Update notification badge visibility & count
-    const badge = document.getElementById("savedCountBadge");
-    if (badge) {
-      badge.textContent = count;
-      if (count > 0) {
-        badge.classList.remove("hidden");
-      } else {
-        badge.classList.add("hidden");
-      }
-    }
-
-    // Render the saved items list dynamically into #savedInfoContainer
-    const container = document.getElementById("savedInfoContainer");
-    if (container) {
-      container.innerHTML = ""; // Clear existing list
-      
-      if (items.length === 0) {
-        container.innerHTML = `<p class="text-gray-500 text-sm italic p-4 bg-white rounded-xl border border-gray-200">No saved information available yet.</p>`;
-      } else {
-        items.reverse().forEach(item => {
-          const card = document.createElement("div");
-          card.className = "p-4 bg-white border-2 border-gray-200 rounded-xl shadow-sm mb-3";
-          card.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-sm text-blue-900">${item.title}</span>
-              <span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-semibold">${item.category || 'General'}</span>
-            </div>
-            <p class="text-sm text-gray-700">${item.details}</p>
-          `;
-          container.appendChild(card);
+            const container = document.getElementById("savedInfoContainer");
+            if (container) {
+                container.innerHTML = "";
+                if (items.length === 0) {
+                    container.innerHTML = `<p class="text-gray-500 text-sm italic p-4 bg-white rounded-xl border border-gray-200">No saved information available yet.</p>`;
+                } else {
+                    items.reverse().forEach(item => {
+                        const card = document.createElement("div");
+                        card.className = "p-4 bg-white border-2 border-gray-200 rounded-xl shadow-sm mb-3";
+                        card.innerHTML = `
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-sm text-blue-900">${item.title}</span>
+                                <span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-semibold">${item.category || 'General'}</span>
+                            </div>
+                            <p class="text-sm text-gray-700">${item.details}</p>
+                        `;
+                        container.appendChild(card);
+                    });
+                }
+            }
         });
-      }
-    }
-  });
-</script>
+    </script>
+
+    <!-- Global Interface Helpers Script -->
+    <script>
+        function showToast(message) {
+            const toast = document.getElementById("copyToast");
+            const msgEl = document.getElementById("toastMsg");
+            if(msgEl) msgEl.textContent = message;
+            if(toast) {
+                toast.classList.remove("hidden");
+                setTimeout(() => {
+                    toast.classList.add("hidden");
+                }, 3000);
+            }
+        }
+
+        function switchTab(tabId) {
+            // Placeholder for tab switching logic if needed across views
+            console.log("Switching to tab:", tabId);
+        }
+
+        function switchSubSection(section) {
+            const otherSec = document.getElementById("otherInfoSubSection");
+            const savedSec = document.getElementById("savedInfoSubSection");
+            const otherBtn = document.getElementById("otherInfoBtn");
+            const savedBtn = document.getElementById("savedInfoBtn");
+
+            if (section === 'otherInfo') {
+                otherSec?.classList.remove('hidden');
+                savedSec?.classList.add('hidden');
+                otherBtn?.classList.replace('bg-white', 'bg-customBlue-600');
+                otherBtn?.classList.replace('text-customBlue-800', 'text-white');
+                savedBtn?.classList.replace('bg-customBlue-600', 'bg-white');
+                savedBtn?.classList.replace('text-white', 'text-customBlue-800');
+            } else {
+                otherSec?.classList.add('hidden');
+                savedSec?.classList.remove('hidden');
+                savedBtn?.classList.replace('bg-white', 'bg-customBlue-600');
+                savedBtn?.classList.replace('text-customBlue-800', 'text-white');
+                otherBtn?.classList.replace('bg-customBlue-600', 'bg-white');
+                otherBtn?.classList.replace('text-white', 'text-customBlue-800');
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const pwdInput = document.getElementById("passwordInput");
+            if (pwdInput) {
+                pwdInput.type = pwdInput.type === "password" ? "text" : "password";
+            }
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById("usernameInput")?.value.trim();
+            const pass = document.getElementById("passwordInput")?.value.trim();
+            const errorDiv = document.getElementById("loginError");
+
+            if (user === "Co.center" && pass === "Eeu@7") {
+                document.getElementById("loginScreen")?.classList.add("hidden");
+                document.getElementById("dashboardScreen")?.classList.remove("hidden");
+            } else {
+                if(errorDiv) {
+                    errorDiv.textContent = "Invalid username or password / የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል";
+                    errorDiv.classList.remove("hidden");
+                }
+            }
+        }
+
+        function logout() {
+            document.getElementById("dashboardScreen")?.classList.add("hidden");
+            document.getElementById("loginScreen")?.classList.remove("hidden");
+        }
+
+        function handleComplainInput(el) {
+            const val = el.value.replace(/\D/g, '');
+            el.value = val;
+            const counter = document.getElementById("complainCounter");
+            const error = document.getElementById("complainError");
+            const output = document.getElementById("complainSmsOutputText");
+            const status = document.getElementById("complainStatus");
+            const copyBtn = document.getElementById("copyComplainBtn");
+
+            if(counter) counter.textContent = `${val.length} / 10 digits`;
+
+            if (val.length === 10) {
+                error?.classList.add("hidden");
+                if(output) output.textContent = `COMPLAIN:${val}`;
+                if(status) { status.textContent = "Complete"; status.className = "px-2 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold text-[10px] rounded-full"; }
+                if(copyBtn) { copyBtn.disabled = false; copyBtn.classList.remove("opacity-50", "cursor-not-allowed"); }
+            } else {
+                if(output) output.textContent = "-- Complain SMS will appear here --";
+                if(status) { status.textContent = "Incomplete"; status.className = "px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full"; }
+                if(copyBtn) { copyBtn.disabled = true; copyBtn.classList.add("opacity-50", "cursor-not-allowed"); }
+                if(val.length > 0 && val.length < 10) error?.classList.remove("hidden");
+                else error?.classList.add("hidden");
+            }
+        }
+
+        function handleTokenInput(el) {
+            const val = el.value.replace(/\D/g, '');
+            el.value = val;
+            const counter = document.getElementById("tokenCounter");
+            const error = document.getElementById("tokenError");
+            const output = document.getElementById("tokenSmsOutputText");
+            const status = document.getElementById("tokenStatus");
+            const copyBtn = document.getElementById("copyTokenBtn");
+
+            if(counter) counter.textContent = `${val.length} / 20 digits`;
+
+            if (val.length === 20) {
+                error?.classList.add("hidden");
+                if(output) output.textContent = `TOKEN:${val}`;
+                if(status) { status.textContent = "Complete"; status.className = "px-2 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold text-[10px] rounded-full"; }
+                if(copyBtn) { copyBtn.disabled = false; copyBtn.classList.remove("opacity-50", "cursor-not-allowed"); }
+            } else {
+                if(output) output.textContent = "-- Token SMS will appear here --";
+                if(status) { status.textContent = "Incomplete"; status.className = "px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full"; }
+                if(copyBtn) { copyBtn.disabled = true; copyBtn.classList.add("opacity-50", "cursor-not-allowed"); }
+                if(val.length > 0 && val.length < 20) error?.classList.remove("hidden");
+                else error?.classList.add("hidden");
+            }
+        }
+
+        function copyComplainSms() {
+            const text = document.getElementById("complainSmsOutputText")?.textContent;
+            if(text) {
+                navigator.clipboard.writeText(text);
+                showToast("Complain SMS copied to clipboard!");
+            }
+        }
+
+        function copyTokenSms() {
+            const text = document.getElementById("tokenSmsOutputText")?.textContent;
+            if(text) {
+                navigator.clipboard.writeText(text);
+                showToast("Token SMS copied to clipboard!");
+            }
+        }
+
+        function fillSampleSms() {
+            const compInput = document.getElementById("complainInput");
+            const tokInput = document.getElementById("tokenInput");
+            if(compInput) { compInput.value = "8011223344"; handleComplainInput(compInput); }
+            if(tokInput) { tokInput.value = "00112233445566778899"; handleTokenInput(tokInput); }
+            showToast("Sample data filled successfully!");
+        }
+
+        function resetSmsForm() {
+            const compInput = document.getElementById("complainInput");
+            const tokInput = document.getElementById("tokenInput");
+            if(compInput) { compInput.value = ""; handleComplainInput(compInput); }
+            if(tokInput) { tokInput.value = ""; handleTokenInput(tokInput); }
+            showToast("Form fields cleared.");
+        }
+
+        function handleLanguageChange() {
+            // Language selector handler hook
+        }
+    </script>
+
     <!-- EDIT MODAL -->
     <div id="editModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4">
@@ -259,7 +389,6 @@
         </div>
 
         <form id="loginForm" onsubmit="handleLogin(event)" class="p-8 space-y-6" novalidate>
-            <!-- Username Input -->
             <div>
                 <label for="usernameInput" class="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">
                     Username / የተጠቃሚ ስም
@@ -275,7 +404,6 @@
                 >
             </div>
 
-            <!-- Password Input -->
             <div>
                 <label for="passwordInput" class="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-2">
                     Password / የይለፍ ቃል
@@ -304,7 +432,6 @@
                 </div>
             </div>
 
-            <!-- Remember Me Checkbox -->
             <div class="flex items-center justify-between">
                 <label class="flex items-center gap-3 cursor-pointer select-none">
                     <input 
@@ -316,10 +443,8 @@
                 </label>
             </div>
 
-            <!-- Dynamic Error Banner -->
             <div id="loginError" class="hidden p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm text-center font-bold" aria-live="polite"></div>
 
-            <!-- Submit Button -->
             <button 
                 type="submit" 
                 id="loginBtn"
@@ -333,7 +458,6 @@
 
     <!-- MAIN DASHBOARD -->
     <div id="dashboardScreen" class="max-w-7xl w-full bg-white shadow-2xl rounded-2xl border border-gray-200 overflow-hidden hidden">
-        <!-- Dashboard Header -->
         <div class="bg-customGreen-950 p-5 sm:p-7 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-customGreen-900">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold flex items-center gap-2 tracking-wide text-amber-400">
@@ -346,58 +470,45 @@
             </button>
         </div>
 
-        <!-- Main Dashboard Navigation & Body Layout -->
         <div class="flex flex-col md:flex-row min-h-[650px]">
             <!-- Sidebar -->
             <div class="bg-customGreen-950 w-full md:w-80 shrink-0 p-4 flex flex-col space-y-2.5 border-r border-customGreen-900">
-                           <!-- Nav Item 1: SMS Generator (Moved to 1st Position) -->
                 <button id="tab6Btn" onclick="switchTab('smsTab')" class="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl font-bold text-base text-amber-400 bg-emerald-900/80 border border-white/30 shadow-inner transition group text-left">
                     <span class="text-xl">💬</span>
                     <span>
-  1. SMS Generator (Complain & Token)<br>
+                        1. SMS Generator (Complain & Token)<br>
+                        <span class="text-xs font-normal opacity-80">1.Amh... 2.Afaan... 3.Tig... 4.Eng...</span>
+                    </span>
+                </button>
 
-          1.Amh...<br>
-          2.Afaan.o...<br>
-          3.Tig...<br>
-          4.Eng...
-</span>
-</button>
-
-                <!-- Nav Item 2: Feeder Code -->
                 <button id="tab1Btn" onclick="switchTab('feederTab')" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm sm:text-base text-white bg-customGreen-950 hover:bg-customGreen-900/50 border border-white/20 hover:border-white/50 transition text-left">
                     <span class="text-xl">🔍</span>
                     <span>2. Feeder Code with cover place</span>
                 </button>
 
-                <!-- Nav Item 3: Find DUMMY by Place -->
                 <button id="tab2Btn" onclick="switchTab('placeTab')" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm sm:text-base text-white bg-customGreen-950 hover:bg-customGreen-900/50 border border-white/20 hover:border-white/50 transition text-left">
                     <span class="text-xl">📍</span>
                     <span>3. Find DUMMY by Place</span>
                 </button>
 
-                <!-- Nav Item 4: Find CENTER by RSG -->
                 <button id="tab3Btn" onclick="switchTab('rsgTab')" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm sm:text-base text-white bg-customGreen-950 hover:bg-customGreen-900/50 border border-white/20 hover:border-white/50 transition text-left">
                     <span class="text-xl">🏢</span>
                     <span>4. Find CENTER by RSG</span>
                 </button>
 
-                <!-- Section Divider -->
                 <div class="pt-3 pb-1 px-2">
                     <span class="text-[11px] font-extrabold tracking-widest text-amber-400/90 uppercase">DIRECTORIES & CONTACTS</span>
                 </div>
 
-                <!-- Nav Item 5: Directory -->
                 <button id="tab4Btn" onclick="switchTab('directoryTab')" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm sm:text-base text-white bg-customGreen-950 hover:bg-customGreen-900/50 border border-white/20 hover:border-white/50 transition text-left">
                     <span class="text-xl">📞</span>
                     <span>5. #CONTACT NO. FOR HEAD office, branch & Directory</span>
                 </button>
 
-                <!-- Section Divider -->
                 <div class="pt-3 pb-1 px-2">
                     <span class="text-[11px] font-extrabold tracking-widest text-amber-400/90 uppercase">SYSTEM SHORTCUTS & TOOLS</span>
                 </div>
 
-                <!-- Nav Item 6: Quick Links -->
                 <button id="tab5Btn" onclick="switchTab('linksTab')" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm sm:text-base text-white bg-customGreen-950 hover:bg-customGreen-900/50 border border-white/20 hover:border-white/50 transition text-left">
                     <span class="text-xl">🔗</span>
                     <span>6. Quick Links (አስፈላጊ አገናኞች)</span>
@@ -406,171 +517,170 @@
 
             <!-- Content Area -->
             <div class="p-4 sm:p-8 flex-1 bg-white overflow-x-hidden">
-                
                 <div id="smsTab" class="space-y-6">
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
-        <div>
-            <h2 id="smsMainTitle" class="text-2xl font-bold text-gray-900 mb-1">SMS Generator (Separated)</h2>
-            <p id="smsMainSubtitle" class="text-gray-600 text-sm sm:text-base">የአቤቱታ ቁጥር እና የቶከን ቁጥር SMS ማዘጋጃዎች</p>
-        </div>
-        
-        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <!-- Toggle Sub-Section Buttons -->
-            <div class="flex items-center gap-2 mb-4">
-                <button id="otherInfoBtn" onclick="switchSubSection('otherInfo')" class="bg-customBlue-600 text-white font-bold py-2 px-4 rounded-lg text-sm">
-                    1. Other Information
-                </button>
-
-                <button id="savedInfoBtn" onclick="switchSubSection('savedInfo')" class="relative bg-white text-customBlue-800 border border-customBlue-400 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
-                    <span>📂 2. Saved Info (<span id="savedTotalInline">0</span>)</span>
-                    <span id="savedCountBadge" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
-                        0
-                    </span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SUB-SECTION 1: OTHER INFORMATION FORM -->
-    <div id="otherInfoSubSection" class="space-y-6">
-        <div class="bg-customBlue-50/80 border-2 border-customBlue-300 rounded-2xl p-5 shadow-sm">
-            <h3 class="text-lg font-bold text-customBlue-950 mb-3 flex items-center gap-2">
-                📌 1. Add Other Information / ተጨማሪ መረጃ ማስገቢያ
-            </h3>
-            <form id="otherInfoForm" onsubmit="handleSaveInfo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Title / Title Code:</label>
-                    <input type="text" id="infoTitle" required placeholder="e.g. Feeder Outage, Note..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Category / Type:</label>
-                    <input type="text" id="infoCategory" required placeholder="e.g. Technical, Billing..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Details / Description:</label>
-                    <input type="text" id="infoDetails" required placeholder="Enter details to be stored..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
-                </div>
-                <div class="sm:col-span-3 flex justify-end">
-                    <button type="submit" class="bg-customBlue-600 hover:bg-customBlue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition flex items-center gap-2">
-                        💾 Save Information to No. 2
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- SUB-SECTION 2: SAVED INFO LIST CONTAINER -->
-    <div id="savedInfoSubSection" class="space-y-4 hidden">
-        <h3 class="text-lg font-bold text-gray-900 mb-2">📂 Globally Saved Information List</h3>
-        <div id="savedInfoContainer">
-            <!-- Saved items will populate here automatically in real time -->
-        </div>
-    </div>
-</div>
-                        <!-- Form Control Actions Bar -->
-                        <div class="flex flex-wrap gap-3">
-                            <button id="fillSampleBtn" onclick="fillSampleSms()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center gap-2">
-                                🎲 Fill Sample Data
-                            </button>
-                            <button id="resetFormBtn" onclick="resetSmsForm()" class="bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center gap-2">
-                                🧹 Reset Both Form Inputs
-                            </button>
-<!-- Language Switcher -->
-                            <select id="smsLang" onchange="handleLanguageChange()" class="p-2.5 border-2 border-gray-300 rounded-xl font-bold text-gray-800 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-customBlue-500 text-xs sm:text-sm">
-                                <option value="am">አማርኛ (Amharic)</option>
-                                <option value="om">Afaan Oromoo</option>
-                                <option value="ti">ትግርኛ (Tigrinya)</option>
-                                <option value="en">English</option>
-                            </select>                        </div>
-
-                        <!-- SMS Generators Grid -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- COMPLAIN SMS BOX (GREEN THEME) -->
-                            <div class="bg-customGreen-50/60 p-6 rounded-2xl border-2 border-customGreen-300 space-y-4 flex flex-col justify-between shadow-sm">
-                                <div class="space-y-4">
-                                    <div class="flex justify-between items-center border-b border-customGreen-200 pb-2">
-                                        <h3 id="complainTitle" class="text-lg font-bold text-customGreen-950 flex items-center gap-2">
-                                            📌 Complain SMS Generator
-                                        </h3>
-                                        <span id="complainCounter" class="text-xs font-bold text-gray-500">0 / 10 digits</span>
-                                    </div>
-                                    <div>
-                                        <label id="complainLabel" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                                            Complain No / የአቤቱታ ቁጥር:
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            id="complainInput" 
-                                            maxlength="10" 
-                                            placeholder="e.g. 8011223344" 
-                                            class="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-customGreen-300 focus:border-customGreen-600 text-lg font-mono font-bold text-gray-900 bg-white"
-                                            oninput="handleComplainInput(this)"
-                                        />
-                                        <p id="complainError" class="text-xs text-red-600 font-bold mt-1 hidden">❌ Complain No must be exactly 10 digits</p>
-                                    </div>
-                                    <!-- Live Preview Display -->
-                                    <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span id="complainPreviewHeader" class="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Complain Live Preview</span>
-                                            <span id="complainStatus" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full">Incomplete</span>
-                                        </div>
-                                        <div id="complainSmsOutputText" class="font-mono text-xs sm:text-sm text-customGreen-300 leading-relaxed min-h-[90px] whitespace-pre-wrap break-all">-- Complain SMS will appear here --</div>
-                                    </div>
-                                </div>
-                                <button 
-                                    id="copyComplainBtn" 
-                                    onclick="copyComplainSms()" 
-                                    disabled 
-                                    class="w-full bg-customGreen-600 hover:bg-customGreen-500 disabled:bg-gray-400 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-base shadow-md disabled:cursor-not-allowed opacity-50 disabled:opacity-50 mt-4"
-                                >
-                                    📋 Copy Complain SMS
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+                        <div>
+                            <h2 id="smsMainTitle" class="text-2xl font-bold text-gray-900 mb-1">SMS Generator (Separated)</h2>
+                            <p id="smsMainSubtitle" class="text-gray-600 text-sm sm:text-base">የአቤቱታ ቁጥር እና የቶከን ቁጥር SMS ማዘጋጃዎች</p>
+                        </div>
+                        
+                        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                            <div class="flex items-center gap-2 mb-4">
+                                <button id="otherInfoBtn" onclick="switchSubSection('otherInfo')" class="bg-customBlue-600 text-white font-bold py-2 px-4 rounded-lg text-sm">
+                                    1. Other Information
                                 </button>
-                            </div>
-
-                            <!-- TOKEN SMS BOX (GREEN THEME) -->
-                            <div class="bg-emerald-50/60 p-6 rounded-2xl border-2 border-emerald-300 space-y-4 flex flex-col justify-between shadow-sm">
-                                <div class="space-y-4">
-                                    <div class="flex justify-between items-center border-b border-emerald-200 pb-2">
-                                        <h3 id="tokenTitle" class="text-lg font-bold text-emerald-950 flex items-center gap-2">
-                                            🔑 Token SMS Generator
-                                        </h3>
-                                        <span id="tokenCounter" class="text-xs font-bold text-gray-500">0 / 20 digits</span>
-                                    </div>
-                                    <div>
-                                        <label id="tokenLabel" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                                            Token No / የቶከን ቁጥር:
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            id="tokenInput" 
-                                            maxlength="26" 
-                                            placeholder="e.g. 00112233445566778899" 
-                                            class="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-emerald-300 focus:border-emerald-600 text-lg font-mono font-bold text-gray-900 bg-white"
-                                            oninput="handleTokenInput(this)"
-                                        />
-                                        <p id="tokenError" class="text-xs text-red-600 font-bold mt-1 hidden">❌ Token No must be exactly 20 digits</p>
-                                    </div>
-                                    <!-- Live Preview Display -->
-                                    <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span id="tokenPreviewHeader" class="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Token Live Preview</span>
-                                            <span id="tokenStatus" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full">Incomplete</span>
-                                        </div>
-                                        <div id="tokenSmsOutputText" class="font-mono text-xs sm:text-sm text-customGreen-300 leading-relaxed min-h-[90px] whitespace-pre-wrap break-all">-- Token SMS will appear here --</div>
-                                    </div>
-                                </div>
-                                <button 
-                                    id="copyTokenBtn" 
-                                    onclick="copyTokenSms()" 
-                                    disabled 
-                                    class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-400 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-base shadow-md disabled:cursor-not-allowed opacity-50 disabled:opacity-50 mt-4"
-                                >
-                                    📋 Copy Token SMS
+                                <button id="savedInfoBtn" onclick="switchSubSection('savedInfo')" class="relative bg-white text-customBlue-800 border border-customBlue-400 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2">
+                                    <span>📂 2. Saved Info (<span id="savedTotalInline">0</span>)</span>
+                                    <span id="savedCountBadge" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-md animate-pulse">
+                                        0
+                                    </span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
+                    <!-- SUB-SECTION 1: OTHER INFORMATION FORM -->
+                    <div id="otherInfoSubSection" class="space-y-6">
+                        <div class="bg-customBlue-50/80 border-2 border-customBlue-300 rounded-2xl p-5 shadow-sm">
+                            <h3 class="text-lg font-bold text-customBlue-950 mb-3 flex items-center gap-2">
+                                📌 1. Add Other Information / ተጨማሪ መረጃ ማስገቢያ
+                            </h3>
+                            <form id="otherInfoForm" onsubmit="handleSaveInfo(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Title / Title Code:</label>
+                                    <input type="text" id="infoTitle" required placeholder="e.g. Feeder Outage, Note..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Category / Type:</label>
+                                    <input type="text" id="infoCategory" required placeholder="e.g. Technical, Billing..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Details / Description:</label>
+                                    <input type="text" id="infoDetails" required placeholder="Enter details to be stored..." class="w-full p-2.5 border-2 border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-customBlue-500 focus:outline-none">
+                                </div>
+                                <div class="sm:col-span-3 flex justify-end">
+                                    <button type="submit" class="bg-customBlue-600 hover:bg-customBlue-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-md transition flex items-center gap-2">
+                                        💾 Save Information to No. 2
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- SUB-SECTION 2: SAVED INFO LIST CONTAINER -->
+                    <div id="savedInfoSubSection" class="space-y-4 hidden">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">📂 Globally Saved Information List</h3>
+                        <div id="savedInfoContainer">
+                            <!-- Saved items populate dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Form Control Actions Bar -->
+                    <div class="flex flex-wrap gap-3">
+                        <button id="fillSampleBtn" onclick="fillSampleSms()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center gap-2">
+                            🎲 Fill Sample Data
+                        </button>
+                        <button id="resetFormBtn" onclick="resetSmsForm()" class="bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center gap-2">
+                            🧹 Reset Both Form Inputs
+                        </button>
+                        <select id="smsLang" onchange="handleLanguageChange()" class="p-2.5 border-2 border-gray-300 rounded-xl font-bold text-gray-800 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-customBlue-500 text-xs sm:text-sm">
+                            <option value="am">አማርኛ (Amharic)</option>
+                            <option value="om">Afaan Oromoo</option>
+                            <option value="ti">ትግርኛ (Tigrinya)</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+
+                    <!-- SMS Generators Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- COMPLAIN SMS BOX (GREEN THEME) -->
+                        <div class="bg-customGreen-50/60 p-6 rounded-2xl border-2 border-customGreen-300 space-y-4 flex flex-col justify-between shadow-sm">
+                            <div class="space-y-4">
+                                <div class="flex justify-between items-center border-b border-customGreen-200 pb-2">
+                                    <h3 id="complainTitle" class="text-lg font-bold text-customGreen-950 flex items-center gap-2">
+                                        📌 Complain SMS Generator
+                                    </h3>
+                                    <span id="complainCounter" class="text-xs font-bold text-gray-500">0 / 10 digits</span>
+                                </div>
+                                <div>
+                                    <label id="complainLabel" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                                        Complain No / የአቤቱታ ቁጥር:
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="complainInput" 
+                                        maxlength="10" 
+                                        placeholder="e.g. 8011223344" 
+                                        class="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-customGreen-300 focus:border-customGreen-600 text-lg font-mono font-bold text-gray-900 bg-white"
+                                        oninput="handleComplainInput(this)"
+                                    />
+                                    <p id="complainError" class="text-xs text-red-600 font-bold mt-1 hidden">❌ Complain No must be exactly 10 digits</p>
+                                </div>
+                                <!-- Live Preview Display -->
+                                <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span id="complainPreviewHeader" class="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Complain Live Preview</span>
+                                        <span id="complainStatus" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full">Incomplete</span>
+                                    </div>
+                                    <div id="complainSmsOutputText" class="font-mono text-xs sm:text-sm text-customGreen-300 leading-relaxed min-h-[90px] whitespace-pre-wrap break-all">-- Complain SMS will appear here --</div>
+                                </div>
+                            </div>
+                            <button 
+                                id="copyComplainBtn" 
+                                onclick="copyComplainSms()" 
+                                disabled 
+                                class="w-full bg-customGreen-600 hover:bg-customGreen-500 disabled:bg-gray-400 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-base shadow-md disabled:cursor-not-allowed opacity-50 mt-4"
+                            >
+                                📋 Copy Complain SMS
+                            </button>
+                        </div>
+
+                        <!-- TOKEN SMS BOX (GREEN THEME) -->
+                        <div class="bg-emerald-50/60 p-6 rounded-2xl border-2 border-emerald-300 space-y-4 flex flex-col justify-between shadow-sm">
+                            <div class="space-y-4">
+                                <div class="flex justify-between items-center border-b border-emerald-200 pb-2">
+                                    <h3 id="tokenTitle" class="text-lg font-bold text-emerald-950 flex items-center gap-2">
+                                        🔑 Token SMS Generator
+                                    </h3>
+                                    <span id="tokenCounter" class="text-xs font-bold text-gray-500">0 / 20 digits</span>
+                                </div>
+                                <div>
+                                    <label id="tokenLabel" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                                        Token No / የቶከን ቁጥር:
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="tokenInput" 
+                                        maxlength="26" 
+                                        placeholder="e.g. 00112233445566778899" 
+                                        class="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-emerald-300 focus:border-emerald-600 text-lg font-mono font-bold text-gray-900 bg-white"
+                                        oninput="handleTokenInput(this)"
+                                    />
+                                    <p id="tokenError" class="text-xs text-red-600 font-bold mt-1 hidden">❌ Token No must be exactly 20 digits</p>
+                                </div>
+                                <!-- Live Preview Display -->
+                                <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span id="tokenPreviewHeader" class="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">Token Live Preview</span>
+                                        <span id="tokenStatus" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 font-bold text-[10px] rounded-full">Incomplete</span>
+                                    </div>
+                                    <div id="tokenSmsOutputText" class="font-mono text-xs sm:text-sm text-emerald-300 leading-relaxed min-h-[90px] whitespace-pre-wrap break-all">-- Token SMS will appear here --</div>
+                                </div>
+                            </div>
+                            <button 
+                                id="copyTokenBtn" 
+                                onclick="copyTokenSms()" 
+                                disabled 
+                                class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-400 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-base shadow-md disabled:cursor-not-allowed opacity-50 mt-4"
+                            >
+                                📋 Copy Token SMS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
                     <!-- SUB-SECTION 2: SAVED INFORMATION DISPLAY TABLE -->
                     <div id="savedInfoSubSection" class="space-y-4 hidden">
                         <div class="bg-white border-2 border-customGreen-300 rounded-2xl p-6 shadow-sm">
