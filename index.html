@@ -109,7 +109,20 @@
     });
   };
 
-  // --- 2. LISTEN FOR REAL-TIME UPDATES & RENDER LIST + COUNTS ---
+  // --- 2. VIEW SWITCHER (Fixes the jumping/scrolling issue) ---
+  window.switchView = function(viewId) {
+    // Hide all main content sections (make sure your views have classes or IDs like 'view-1', 'view-2', etc.)
+    const views = document.querySelectorAll('.portal-view');
+    views.forEach(v => v.classList.add('hidden'));
+
+    // Show the target view
+    const targetView = document.getElementById(viewId);
+    if (targetView) {
+      targetView.classList.remove('hidden');
+    }
+  };
+
+  // --- 3. LISTEN FOR REAL-TIME UPDATES & RENDER LIST + COUNTS ---
   const dbRef = ref(db, 'saved_info');
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
